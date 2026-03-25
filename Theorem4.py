@@ -181,7 +181,7 @@ def q1bounds(fineness:int):
             oldq1 = currentq1
             print(currentq1,(round(a,2),b))
         
-        
+
 #------------depricated------------
 def findq1boundarylambdafixedq2large(f:int,maxtest:int = 10**3,r:int = 3,lamb:float = 3/4) -> int:
     q1 = 3
@@ -195,7 +195,6 @@ def findq1boundarylambdafixedq2large(f:int,maxtest:int = 10**3,r:int = 3,lamb:fl
             return sy.prevprime(q1)
         q1 = sy.nextprime(q1)
        
-        
 def plot_q1bounds():
     ypoints=np.array([])
     xpoints=np.array([])
