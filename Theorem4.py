@@ -1,8 +1,6 @@
 import math as ma
-import numpy as np
 import sympy as sy
 from sympy import primerange 
-import matplotlib.pyplot as plt
 
 #Case 1, q_1,q_2 < h
 def VariablesC1(q_1:int,q_2:int,f:int,h:int) -> list:
@@ -160,7 +158,7 @@ def findq1bound(f:int):
     return q1bound
 
 #Traverse range 10^14 - 10^20 via a*10^b 
-#For each 14<= b(int) <= 20, increments a by 1/finiteness
+#For each 14<= b(int) <= 20, increments a by 1/fineness
 #Prints "p (a,b)" st for all f>a*10^b, q1>=p implies f not Norm-Euclidean 
 def q1bounds(fineness:int):
     c = fineness
@@ -181,27 +179,3 @@ def q1bounds(fineness:int):
             oldq1 = currentq1
             print(currentq1,(round(a,2),b))
         
-
-#------------depricated------------
-def findq1boundarylambdafixedq2large(f:int,maxtest:int = 10**3,r:int = 3,lamb:float = 3/4) -> int:
-    q1 = 3
-    q2max = q_2max(f)
-
-    while q1<maxtest:
-        test = 0
-        if Hcondition(q1,q2max,f,lamb,r):
-            test = 1
-        if test == 0:
-            return sy.prevprime(q1)
-        q1 = sy.nextprime(q1)
-       
-def plot_q1bounds():
-    ypoints=np.array([])
-    xpoints=np.array([])
-    for n in range(69):
-        a = ((n) % 10)+1
-        b = (n)//10
-        f = a * 10**(14+b)
-        xpoints = np.append(xpoints,[n])
-        ypoints = np.append(ypoints,[findq1bound(f)[0]])
-    return plt.plot(xpoints,ypoints),plt.ylabel('log10(q)>y => win'), plt.xlabel('n')
