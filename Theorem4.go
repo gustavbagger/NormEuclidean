@@ -5,27 +5,31 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"math/big"
 	"os"
 	"strconv"
 )
 
 type VariableState struct {
-	q1, q2, h, f, u, sigma, phi uint64
-	H, X, E                     float64
-	Case, r                     int
+	H                        *big.Float
+	q1, q2, h, u, sigma, phi uint64
+	X, E, sqrtF              float64
+	Case, r                  int
 }
 
-func VariableStateNew(q1, q2, f uint64, lambda float64, r int) VariableState {
-	H := float64(f) / float64(q1*q2)
+func VariableStateNew(q1, q2 uint64, sqrtF, lambda float64, r int) VariableState {
+	bigSqrtF := big.NewFloat(sqrtF)
+	F := big.NewFloat(1).Mul(bigSqrtF, bigSqrtF)
+	H := big.NewFloat(1).Quo(F, big.NewFloat(float64(q1*q2)))
+
 	var Case int
 	var u, sigma, phi uint64
 	if q2 < (q1 << 1) {
-		H /= 3
+		H.Quo(H, big.NewFloat(3))
 	} else {
-		H /= 2
+		H.Quo(H, big.NewFloat(2))
 	}
-
-	h := hSet(f, lambda, r)
+	h := hSet(sqrtF, lambda, r)
 
 	if q2 < h {
 		Case = 1
@@ -44,12 +48,13 @@ func VariableStateNew(q1, q2, f uint64, lambda float64, r int) VariableState {
 		phi = 1
 	}
 
-	X := H / float64(h)
+	X, _ := big.NewFloat(1).Quo(H, big.NewFloat(float64(h))).Float64()
 	E := 1 - (float64(sigma)/4.0+(float64(phi)/float64(u))+(float64(phi)/X))*
 		(float64(sigma)/X)*
 		math.Pi*
 		math.Pi/6.0
-	return VariableState{q1, q2, h, f, u, sigma, phi, H, X, E, Case, r}
+
+	return VariableState{H, q1, q2, h, u, sigma, phi, X, E, sqrtF, Case, r}
 }
 
 func (vars VariableState) validateE() bool {
@@ -83,8 +88,8 @@ func (vars VariableState) dSet() (float64, error) {
 	}
 }
 
-func hSet(f uint64, lambda float64, r int) uint64 {
-	return uint64(math.Ceil(lambda * math.Pow(float64(f), 1.0/float64(2*r))))
+func hSet(sqrtF, lambda float64, r int) uint64 {
+	return uint64(math.Ceil(lambda * math.Pow(sqrtF, 1.0/float64(r))))
 }
 
 func (vars VariableState) WSet() (float64, error) {
@@ -97,42 +102,54 @@ func (vars VariableState) WSet() (float64, error) {
 	for i := 2; i <= vars.r; i++ {
 		factorial *= float64(i) / float64(vars.h)
 	}
-	return float64(2*vars.r-1) + math.Sqrt(float64(vars.f))*d*factorial, nil
+	return float64(2*vars.r-1) + vars.sqrtF*d*factorial, nil
 }
 
+// Check it works without overflow
 func (vars VariableState) validateH() bool {
 	if !vars.validateE() || !vars.validateX() || !vars.validateQ1Q2() {
 		return false
 	} else {
 		W, err := vars.WSet()
 		if err != nil {
-			log.Printf("error: ", err)
+			log.Printf("error: %v\n", err)
 			return false
 		}
-		return vars.H*vars.H >
-			(1.0/vars.E)*
-				(math.Pi*math.Pi/6.0)*
-				float64(vars.sigma)/float64(vars.phi)*
-				float64(vars.u)*
-				float64(vars.h)*
-				math.Sqrt(float64(vars.f))*
-				math.Pow(2.0*float64(vars.h)/float64(vars.h-uint64(3*(3-vars.Case))), float64(2*vars.r))*
-				W
+		HSquared := big.NewFloat(1).Mul(vars.H, vars.H)
+		RHS := big.NewFloat(1)
+		RHS.Mul(RHS, big.NewFloat(1.0/vars.E))
+		RHS.Mul(RHS, big.NewFloat(math.Pi*math.Pi/6.0))
+		RHS.Mul(RHS, big.NewFloat(float64(vars.sigma)/float64(vars.phi)))
+		RHS.Mul(RHS, big.NewFloat(float64(vars.u)))
+		RHS.Mul(RHS, big.NewFloat(float64(vars.h)))
+		RHS.Mul(RHS, big.NewFloat(vars.sqrtF))
+		Temp := big.NewFloat(2.0 * float64(vars.h) / float64(vars.h-uint64(3*(3-vars.Case))))
+		Temp.Mul(Temp, Temp)
+		Pow := big.NewFloat(1)
+		for i := 1; i <= vars.r; i++ {
+			Pow.Mul(Pow, Temp)
+		}
+		RHS.Mul(RHS, Pow)
+		RHS.Mul(RHS, big.NewFloat(W))
+
+		return HSquared.Cmp(RHS) == 1
+
 	}
 }
 
-func largestPossibleQ2(f uint64) uint64 {
-	return uint64(math.Floor(1.821 * math.Pow(float64(f), 0.25) * math.Pow(math.Log(float64(f)), 1.5)))
+func largestPossibleQ2(sqrtF float64) uint64 {
+	return uint64(math.Floor(1.821 * math.Sqrt(sqrtF) * math.Pow(2.0*math.Log(sqrtF), 1.5)))
 }
 
-func smallestFreeWin(f uint64, lambda float64, r, maxTest int) uint64 {
+func smallestFreeWin(sqrtF, lambda float64, r, maxTest int) uint64 {
 	var varsQ2Large, varsQ2Small VariableState
-	q2Max := largestPossibleQ2(f)
-	h := hSet(f, lambda, r) //This is to validateH when q2 ==h
+	q2Max := largestPossibleQ2(sqrtF)
+
+	h := hSet(sqrtF, lambda, r) //This is to validateH when q2 ==h
 
 	for q1 := uint64(3); q1 < q2Max; q1 += 2 {
-		varsQ2Large = VariableStateNew(q1, q2Max, f, lambda, r)
-		varsQ2Small = VariableStateNew(q1, h, f, lambda, r)
+		varsQ2Large = VariableStateNew(q1, q2Max, sqrtF, lambda, r)
+		varsQ2Small = VariableStateNew(q1, h, sqrtF, lambda, r)
 		if varsQ2Large.validateH() && (q1 >= h || varsQ2Small.validateH()) {
 			continue
 		} else {
@@ -142,7 +159,7 @@ func smallestFreeWin(f uint64, lambda float64, r, maxTest int) uint64 {
 	return uint64(maxTest)
 }
 
-func smallestFreeWinVaryingLambda(f uint64, r, maxTest, steps int) uint64 {
+func smallestFreeWinVaryingLambda(sqrtF float64, r, maxTest, steps int) uint64 {
 	min := 0.5
 	max := 1.5
 	length := max - min
@@ -150,7 +167,7 @@ func smallestFreeWinVaryingLambda(f uint64, r, maxTest, steps int) uint64 {
 	q1Boundary := uint64(1)
 	var q1Try uint64
 	for lambda := min; lambda <= max; lambda += courseness {
-		q1Try = smallestFreeWin(f, lambda, r, maxTest)
+		q1Try = smallestFreeWin(sqrtF, lambda, r, maxTest)
 		if q1Try > q1Boundary {
 			q1Boundary = q1Try
 		}
@@ -170,15 +187,18 @@ func main() {
 	oldq1 := uint64(7)
 	for b := 14; b <= 20; b++ {
 		for i := 0; i < 9*steps; i++ {
-			if b == 20 && i >= 2*steps {
+			if b == 20 && i >= steps {
 				os.Exit(0)
 			}
 			a := 1.0 + float64(i)/float64(steps)
-			f := uint64(math.Ceil(a * math.Pow10(b)))
-			currentq1 := smallestFreeWinVaryingLambda(f, 3, 1000, steps)
+			sqrtF := math.Sqrt(math.Ceil(a * math.Pow10(b)))
+			currentq1 := smallestFreeWinVaryingLambda(sqrtF, 3, 1000, steps)
+
 			if currentq1 > oldq1 {
 				oldq1 = currentq1
-				fmt.Printf("%v, %2.f*10^%v\n", currentq1, a, b)
+				if big.NewInt(int64(currentq1)).ProbablyPrime(2) {
+					fmt.Printf("%v, %.2f*10^%v \n", currentq1, a, b)
+				}
 			}
 		}
 	}
