@@ -105,7 +105,6 @@ func (vars VariableState) WSet() (float64, error) {
 	return float64(2*vars.r-1) + vars.sqrtF*d*factorial, nil
 }
 
-// Check it works without overflow
 func (vars VariableState) validateH() bool {
 	if !vars.validateE() || !vars.validateX() || !vars.validateQ1Q2() {
 		return false
@@ -175,7 +174,6 @@ func smallestFreeWinVaryingLambda(sqrtF float64, r, maxTest, steps int) uint64 {
 	return q1Boundary
 }
 
-// Need to fix that f>max(uint64)
 func main() {
 	if len(os.Args) != 2 {
 		log.Fatalln("Wrong arguments. Usage: go run . <steps (int)>")
