@@ -159,8 +159,8 @@ func smallestFreeWin(sqrtF, lambda float64, r, maxTest int) uint64 {
 }
 
 func smallestFreeWinVaryingLambda(sqrtF float64, r, maxTest, steps int) uint64 {
-	min := 0.5
-	max := 1.5
+	min := 0.1
+	max := 2.0
 	length := max - min
 	courseness := length / float64(steps)
 	q1Boundary := uint64(1)
