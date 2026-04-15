@@ -8,11 +8,15 @@ This algorithm enumerates primes p in the range 2x10^14 - 2x10^20 with no small 
 Let q1 be the least (prime) cubic non-residue modulo a prime p. Then, this algorithm computes a cutoff N, non-decreasing with respect to p, such that:
 If q1<= N, then the cyclic cubic field with conductor p is not Norm-Euclidean.
 
-### Quick Start
-```bash
-# install using Go toolchain
-go install github.com/gustavbagger/NormEuclidean
+## Quick Start
 
-# run
-NormEuclidean <numerical precision (int)>
+### Clone the repo
+
+```bash
+git clone https://github.com/gustavbagger/NormEuclidean
+cd NormEuclidean
 ```
+
+### Submit a pull request
+
+If you'd like to contribute, please fork the repository and open a pull request to the `main` branch.
